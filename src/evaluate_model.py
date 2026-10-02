@@ -7,6 +7,8 @@ Usage:
 """
 
 import argparse
+from dataclasses import dataclass
+
 import numpy as np
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForTokenClassification, Trainer
@@ -15,10 +17,23 @@ import evaluate as evaluate_lib
 from train import tokenize_and_align_labels
 
 
-def parse_args():
+@dataclass
+class EvalArgs:
+    """
+    Typed container for command-line arguments. We convert argparse's
+    Namespace into this right after parsing so that editors/type-checkers
+    (like Pylance) can see args.model_dir as a real, known attribute,
+    instead of flagging it as unresolved on a generic Namespace object.
+    """
+
+    model_dir: str
+
+
+def parse_args() -> EvalArgs:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", type=str, default="ner-model/final")
-    return parser.parse_args()
+    namespace = parser.parse_args()
+    return EvalArgs(model_dir=namespace.model_dir)
 
 
 def extract_predictions_and_labels(logits, labels, label_names):
@@ -61,7 +76,7 @@ def main():
         remove_columns=raw_datasets["test"].column_names,
     )
 
-    trainer = Trainer(model=model, tokenizer=tokenizer)
+    trainer = Trainer(model=model, processing_class=tokenizer)
     logits, labels, _ = trainer.predict(tokenized_test)
     true_predictions, true_labels = extract_predictions_and_labels(
         logits, labels, label_names
