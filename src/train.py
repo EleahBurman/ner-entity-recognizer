@@ -9,6 +9,9 @@ Usage:
 """
 
 import argparse
+from dataclasses import dataclass
+from typing import Optional
+
 import numpy as np
 from datasets import load_dataset
 from transformers import (
@@ -24,7 +27,23 @@ MODEL_CHECKPOINT = "distilbert-base-uncased"
 OUTPUT_DIR = "ner-model"
 
 
-def parse_args():
+@dataclass
+class TrainArgs:
+    """
+    Typed container for command-line arguments. We convert argparse's
+    Namespace into this right after parsing so that editors/type-checkers
+    (like Pylance) can see each field (args.epochs, args.max_samples, etc.)
+    as a known attribute, instead of flagging it as unresolved on a
+    generic Namespace object.
+    """
+
+    epochs: int
+    batch_size: int
+    learning_rate: float
+    max_samples: Optional[int]
+
+
+def parse_args() -> TrainArgs:
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=16)
@@ -35,7 +54,13 @@ def parse_args():
         default=None,
         help="If set, truncate train/val sets to this many examples (useful for smoke tests on CPU).",
     )
-    return parser.parse_args()
+    namespace = parser.parse_args()
+    return TrainArgs(
+        epochs=namespace.epochs,
+        batch_size=namespace.batch_size,
+        learning_rate=namespace.learning_rate,
+        max_samples=namespace.max_samples,
+    )
 
 
 def tokenize_and_align_labels(examples, tokenizer):
@@ -147,7 +172,7 @@ def main():
         train_dataset=tokenized_datasets["train"],
         eval_dataset=tokenized_datasets["validation"],
         data_collator=data_collator,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         compute_metrics=compute_metrics,
     )
 
@@ -158,7 +183,7 @@ def main():
     trainer.save_model(f"{OUTPUT_DIR}/final")
     tokenizer.save_pretrained(f"{OUTPUT_DIR}/final")
 
-    print("Done. Run `python src/evaluate.py` to see test-set metrics.")
+    print("Done. Run `python src/evaluate_model.py` to see test-set metrics.")
 
 
 if __name__ == "__main__":
